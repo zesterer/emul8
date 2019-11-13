@@ -124,7 +124,11 @@ impl C8 {
         &self.screen
     }
 
-    fn v(&self, v: V) -> u8 {
+    pub fn pc(&self) -> u16 {
+        self.pc
+    }
+
+    pub fn v(&self, v: V) -> u8 {
         self.v[v.0 as usize]
     }
 
@@ -295,7 +299,7 @@ impl C8 {
         Ok(())
     }
 
-    pub fn tick(&mut self, dur: Duration) -> Result<(), Error> {
+    pub fn tick(&mut self, dur: Duration) -> Result<([u8; 4], Instr), Error> {
         // Update timers
         self.exec_time += dur.as_nanos() as u64;
         if self.exec_time - self.last_pulse > 1000000 / 60 {
@@ -305,8 +309,9 @@ impl C8 {
 
         let opcode = self.fetch(self.pc)?;
         let instr = self.decode(opcode)?;
-        self.execute(instr)
-        //println!("0x{:04X} :: {:X?} ({:X?}) => {:X?}", self.pc, opcode, instr, result);
+        self.execute(instr)?;
+
+        Ok((opcode, instr))
     }
 }
 

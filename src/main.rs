@@ -4,17 +4,36 @@ mod font;
 use std::{
     io::Read,
     fs::File,
+    path::PathBuf,
     time::{Instant, Duration},
     thread,
-    env,
     u32,
 };
-use c8::{C8, SCREEN_SIZE};
+use structopt::StructOpt;
+use crate::c8::{C8, SCREEN_SIZE};
 
-#[derive(Debug)]
-pub enum Error {}
+#[derive(Debug, StructOpt)]
+#[structopt(name = "emul8", )]
+struct Config {
+    #[structopt(short, long, help = "Enable debugging features")]
+    debug: bool,
+    #[structopt(short, long, help = "Specify the number of cycles to execute per frame", default_value = "250")]
+    cycles_per_frame: usize,
+    #[structopt(parse(from_os_str), help = "The CHIP-8 binary to execute")]
+    input: PathBuf,
+}
 
-fn main() -> Result<(), Error> {
+struct State {
+    paused: bool,
+}
+
+fn main() {
+    let config = Config::from_args();
+
+    let mut state = State {
+        paused: config.debug,
+    };
+
     let mut timeout = vec![0.0; SCREEN_SIZE.0 * SCREEN_SIZE.1];
     let mut buf = vec![0; SCREEN_SIZE.0 * SCREEN_SIZE.1];
     let mut win = minifb::Window::new(
@@ -29,22 +48,34 @@ fn main() -> Result<(), Error> {
 
     let mut c8 = C8::default();
 
-    let bin: Vec<_> = File::open(env::args()
-        .nth(1)
-        .unwrap())
+    let bin: Vec<_> = File::open(config.input)
             .unwrap()
             .bytes()
             .collect::<Result<_, _>>()
             .unwrap();
     c8.load(&bin);
 
+    if config.debug {
+        c8.display_mem();
+    }
+
     let mut last_tick = Instant::now();
     while win.is_open() {
         // Tick
+        if !state.paused {
         let now = Instant::now();
-        for _ in 0..250 {
-            c8.tick(now.duration_since(last_tick)).unwrap();
-            last_tick = now;
+            for _ in 0..config.cycles_per_frame {
+                let result = c8.tick(now.duration_since(last_tick));
+
+                if config.debug {
+                    match result {
+                        Ok((opcode, instr)) => println!("0x{:04X} :: {:X?} => {:X?}", c8.pc(), opcode, instr),
+                        Err(err) => println!("ERROR AT 0x{:04X}: {:X?}", c8.pc(), err),
+                    }
+                }
+
+                last_tick = now;
+            }
         }
 
         // Update screen
@@ -64,6 +95,9 @@ fn main() -> Result<(), Error> {
         }
         if win.is_key_pressed(minifb::Key::M, minifb::KeyRepeat::No) {
             c8.display_mem();
+        }
+        if win.is_key_pressed(minifb::Key::P, minifb::KeyRepeat::No) {
+            state.paused ^= true;
         }
 
         c8.set_keys([
@@ -89,6 +123,4 @@ fn main() -> Result<(), Error> {
 
         thread::sleep(Duration::from_millis(1000 / 60));
     }
-
-    Ok(())
 }
