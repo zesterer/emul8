@@ -1,4 +1,5 @@
 mod c8;
+mod font;
 
 use std::{
     io::Read,
@@ -8,20 +9,18 @@ use std::{
     env,
     u32,
 };
-use c8::C8;
+use c8::{C8, SCREEN_SIZE};
 
 #[derive(Debug)]
 pub enum Error {}
 
-const SIZE: (usize, usize) = (64, 32);
-
 fn main() -> Result<(), Error> {
-    let mut timeout = vec![0.0; SIZE.0 * SIZE.1];
-    let mut buf = vec![0; SIZE.0 * SIZE.1];
+    let mut timeout = vec![0.0; SCREEN_SIZE.0 * SCREEN_SIZE.1];
+    let mut buf = vec![0; SCREEN_SIZE.0 * SCREEN_SIZE.1];
     let mut win = minifb::Window::new(
         "Emul8",
-        SIZE.0,
-        SIZE.1,
+        SCREEN_SIZE.0,
+        SCREEN_SIZE.1,
         minifb::WindowOptions {
             scale: minifb::Scale::X16,
             ..Default::default()
@@ -43,7 +42,7 @@ fn main() -> Result<(), Error> {
     while win.is_open() {
         // Tick
         let now = Instant::now();
-        for _ in 0..100 {
+        for _ in 0..250 {
             c8.tick(now.duration_since(last_tick)).unwrap();
             last_tick = now;
         }
