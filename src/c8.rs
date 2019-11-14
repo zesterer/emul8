@@ -1,5 +1,8 @@
 use std::time::Duration;
-use crate::font::FONT;
+use crate::{
+    font::FONT,
+    instr::{V, Instr},
+};
 
 pub const SCREEN_SIZE: (usize, usize) = (64, 32);
 pub const KEY_COUNT: usize = 16;
@@ -11,48 +14,6 @@ pub enum Error {
     NoSuchRcaCall(u16),
     InvalidInstr([u8; 4]),
     OutOfBounds,
-}
-
-#[derive(Copy, Clone, Debug)]
-pub struct V(u8);
-
-#[derive(Copy, Clone, Debug)]
-pub enum Instr {
-    RcaCall(u16),
-    ClearScreen,
-    Return,
-    Jump(u16),
-    Call(u16),
-    SkipIfEqConst(V, u8),
-    SkipIfNotEqConst(V, u8),
-    SkipIfEqReg(V, V),
-    SkipIfNotEqReg(V, V),
-    SetConst(V, u8),
-    AddConst(V, u8),
-    SetReg(V, V),
-    OrReg(V, V),
-    AndReg(V, V),
-    XorReg(V, V),
-    AddReg(V, V),
-    SubReg(V, V),
-    NegReg(V, V),
-    ShrReg(V, V),
-    ShlReg(V, V),
-    SetIndex(u16),
-    AddIndex(V),
-    SetIndexFont(V),
-    JumpPlusV0(u16),
-    RandomAnd(V, u8),
-    Draw(V, V, u8),
-    Load(V),
-    Store(V),
-    StoreBcd(V),
-    GetKey(V),
-    SkipIfKey(V),
-    SkipIfNotKey(V),
-    GetDelay(V),
-    SetDelay(V),
-    SetSound(V),
 }
 
 pub struct C8 {
@@ -91,25 +52,6 @@ impl Default for C8 {
 }
 
 impl C8 {
-    pub fn display_mem(&self) {
-        let row_width = 16;
-        for row_addr in (0..4096).step_by(row_width) {
-            print!("0x{:04X} |", row_addr);
-            for i in 0..row_width {
-                print!(" {:02X}", self.mem[row_addr + i]);
-            }
-            println!("");
-        }
-    }
-
-    pub fn display_regs(&self) {
-        for (i, v) in self.v.iter().enumerate() {
-            println!("v{:x} = 0x{:02X}", i, v);
-        }
-        println!("i = 0x{:04X}", self.i);
-        println!("pc = 0x{:04X}", self.pc);
-    }
-
     pub fn load(&mut self, bytes: &[u8]) {
         for (i, b) in bytes.iter().enumerate() {
             self.mem[PROGRAM_START + i] = *b;
@@ -124,12 +66,20 @@ impl C8 {
         &self.screen
     }
 
+    pub fn mem(&self) -> &[u8; 4096] {
+        &self.mem
+    }
+
     pub fn pc(&self) -> u16 {
         self.pc
     }
 
-    pub fn v(&self, v: V) -> u8 {
-        self.v[v.0 as usize]
+    pub fn i(&self) -> u16 {
+        self.i
+    }
+
+    pub fn v(&self, v: impl Into<V>) -> u8 {
+        self.v[v.into().0 as usize]
     }
 
     fn v_mut(&mut self, v: V) -> &mut u8 {
