@@ -6,6 +6,7 @@ use std::{
     io::Read,
     fs::File,
     path::PathBuf,
+    num::ParseIntError,
     time::{Instant, Duration},
     thread,
     u32,
@@ -16,6 +17,10 @@ use crate::{
     c8::{C8, SCREEN_SIZE},
 };
 
+fn parse_hex(src: &str) -> Result<u32, ParseIntError> {
+    u32::from_str_radix(src, 16)
+}
+
 #[derive(Debug, StructOpt)]
 #[structopt(name = "emul8", )]
 struct Config {
@@ -25,6 +30,12 @@ struct Config {
     cycles_per_frame: usize,
     #[structopt(parse(from_os_str), help = "The CHIP-8 binary to execute")]
     input: PathBuf,
+    #[structopt(short, long, help = "The foreground color to use (in RGB hexadecimal)", default_value = "FFFFFFFF", parse(try_from_str = parse_hex))]
+    fg_color: u32,
+    #[structopt(short, long, help = "The background color to use (in RGB hexadecimal)", default_value = "00000000", parse(try_from_str = parse_hex))]
+    bg_color: u32,
+    #[structopt(short, long, help = "The number of frames that a pixel should stay active for to reduce flicker", default_value = "1")]
+    flicker_timeout: u8,
 }
 
 struct State {
@@ -38,8 +49,8 @@ fn main() {
         paused: config.debug,
     };
 
-    let mut timeout = vec![0.0; SCREEN_SIZE.0 * SCREEN_SIZE.1];
-    let mut buf = vec![0; SCREEN_SIZE.0 * SCREEN_SIZE.1];
+    let mut timeout = vec![0; SCREEN_SIZE.0 * SCREEN_SIZE.1];
+    let mut buf = vec![255; SCREEN_SIZE.0 * SCREEN_SIZE.1];
     let mut win = minifb::Window::new(
         "Emul8",
         SCREEN_SIZE.0,
@@ -85,13 +96,17 @@ fn main() {
         // Update screen
         for (i, px) in c8.screen().iter().enumerate() {
             if *px {
-                timeout[i] = 1.0
+                timeout[i] = 0
             } else {
-                timeout[i] *= 0.5;
+                timeout[i] += 1;
             }
         }
         for (i, t) in timeout.iter().enumerate() {
-            buf[i] = u32::from_le_bytes([(*t * 255.0) as u8; 4]);
+            buf[i] = if *t > config.flicker_timeout {
+                config.bg_color
+            } else {
+                config.fg_color
+            };
         }
 
         if win.is_key_pressed(minifb::Key::R, minifb::KeyRepeat::No) {
