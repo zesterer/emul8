@@ -34,7 +34,7 @@ struct Config {
     fg_color: u32,
     #[structopt(short, long, help = "The background color to use (in RGB hexadecimal)", default_value = "00000000", parse(try_from_str = parse_hex))]
     bg_color: u32,
-    #[structopt(short, long, help = "The number of frames that a pixel should stay active for to reduce flicker", default_value = "1")]
+    #[structopt(long, help = "The number of frames that a pixel should stay active for to reduce flicker", default_value = "1")]
     flicker_timeout: u8,
 }
 
@@ -49,7 +49,7 @@ fn main() {
         paused: config.debug,
     };
 
-    let mut timeout = vec![0; SCREEN_SIZE.0 * SCREEN_SIZE.1];
+    let mut timeout = vec![0u8; SCREEN_SIZE.0 * SCREEN_SIZE.1];
     let mut buf = vec![255; SCREEN_SIZE.0 * SCREEN_SIZE.1];
     let mut win = minifb::Window::new(
         "Emul8",
@@ -98,7 +98,7 @@ fn main() {
             if *px {
                 timeout[i] = 0
             } else {
-                timeout[i] += 1;
+                timeout[i] = timeout[i].saturating_add(1);
             }
         }
         for (i, t) in timeout.iter().enumerate() {
